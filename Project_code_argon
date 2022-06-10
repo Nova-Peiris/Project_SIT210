@@ -1,0 +1,73 @@
+// This #include statement was automatically added by the Particle IDE.
+#include <MQTT.h>
+
+
+// This #include statement was automatically added by the Particle IDE.
+#include <BH1750.h>
+
+// This #include statement was automatically added by the Particle IDE.
+#include <Adafruit_DHT.h>
+
+#define DHTTYPE DHT11
+#define DHTPIN A1
+
+// Create an MQTT client
+MQTT client("test.mosquitto.org", 1883, callback);
+
+// This is called when a message is received. However, we do not use this feature in
+// this project so it will be left empty
+void callback(char* topic, byte* payload, unsigned int length) 
+{
+}
+
+DHT dht(DHTPIN, DHTTYPE);
+
+BH1750 sensor(0x23, Wire);
+
+double brightnessdata = 0;
+
+void setup() {
+  //pinMode(pin, INPUT);
+  
+  sensor.begin();
+
+  sensor.set_sensor_mode(BH1750::forced_mode_high_res2); //configures the sensor
+  
+  Particle.variable("lightSensor", brightnessdata);
+  
+  dht.begin();
+  
+  // Connect to the server and call ourselves "photonDev"
+  client.connect("photonDev");
+  
+  Serial.begin();
+}
+
+void loop() {
+    
+    // Only try to send messages if we are connected
+    if (client.isConnected())
+    {
+        sensor.make_forced_measurement(); //takes a brightness measurement
+
+        brightnessdata = sensor.get_light_level();
+
+        String Light = String(brightnessdata);
+  
+        Particle.publish("Light", Light, PRIVATE); //publishes an event with the brightness data
+        
+        client.publish("Light", Light);
+  
+        String temp = String (dht.getTempCelcius());
+  
+        Particle.publish("temp", temp, PRIVATE);
+        
+        client.publish("temp", temp);
+  
+        delay(5000);   
+        
+        // CALL THIS at the end of your loop
+        client.loop();
+    }
+    
+}
