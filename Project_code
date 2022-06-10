@@ -1,0 +1,193 @@
+import datetime
+import time
+from smbus import SMBus
+from gpiozero import LED
+import RPi.GPIO as GPIO
+import requests
+from tkinter import *
+import tkinter.font
+
+#declare pin number standard
+GPIO.setmode(GPIO.BCM)
+#disable warnings - optional
+GPIO.setwarnings(False)
+
+#sensor def
+led = LED(21)
+buzzer = 18
+GPIO_TRIGGER = 23 
+GPIO_ECHO = 24
+
+#addr of i2c
+addr = 0x23
+
+#set GPIO direction
+GPIO.setup(buzzer,GPIO.OUT)
+GPIO.setup(GPIO_TRIGGER, GPIO.OUT)#ultra sonic
+GPIO.setup(GPIO_ECHO, GPIO.IN)
+
+POWER_DOWN = 0x00 # Power off
+POWER_ON   = 0x01 # Power on
+RESET      = 0x07 # Reset data register
+
+bus = SMBus(1)#I2C bus
+
+#time values
+current = datetime.time(5,0,0)
+start = datetime.time(4,0,0)
+end = datetime.time(8,0,0)
+
+#GUI def
+win = Tk()
+v = tkinter.IntVar()
+
+win.title("Set Alarm")
+myFont = tkinter.font.Font(family = 'Helvetica', size = 12, weight = "bold")
+
+tkinter.Label(win, text="""Enter time in hh:mm:ss format""", justify = tkinter.CENTER, padx = 20).pack()
+
+
+#Event funcs
+
+def convertValue(data):
+  # convert 2 bytes of data into a decimal number.
+  result=(data[1] + (256 * data[0])) / 1.2
+  return (result)
+
+def readLight(addr=addr):
+  # Get data from I2C interface
+  data = bus.read_i2c_block_data(addr,0x20)
+  return convertValue(data)
+
+def distance():
+    #get the distance of the movement
+    GPIO.setmode(GPIO.BCM)
+    GPIO.setup(buzzer,GPIO.OUT)
+    GPIO.setup(GPIO_TRIGGER, GPIO.OUT)
+    GPIO.setup(GPIO_ECHO, GPIO.IN)
+    
+    #distance value from ultra sonic sensor
+    GPIO.output(GPIO_TRIGGER, True)
+    
+    # set Trigger low after 0.01ms 
+    time.sleep(0.00001)
+    GPIO.output(GPIO_TRIGGER, False)
+ 
+    StartTime = time.time()
+    StopTime = time.time()
+ 
+    # save StartTime
+    while GPIO.input(GPIO_ECHO) == 0:
+        StartTime = time.time()
+ 
+    # save time of arrival
+    while GPIO.input(GPIO_ECHO) == 1:
+        StopTime = time.time()
+ 
+    # time difference between start and arrival
+    TimeElapsed = StopTime - StartTime
+    
+    # multiply with the sonic speed (34300 cm/s) and divide by 2
+    distance = (TimeElapsed * 34300) / 2
+ 
+    return distance
+
+def time_in_range(start, end, current):
+    #return time range
+    return start<=current<=end
+
+def close():
+    GPIO.cleanup()
+    win.destroy()
+    
+def clear():
+    my_text1.delete(0, END)
+    my_text2.delete(0, END)
+    my_text3.delete(0, END)
+
+def alarm():
+    input1 = my_text1.get()
+    input2 = my_text2.get()
+    input3 = my_text3.get()
+    
+    try:
+        if int(input1) <=24 and int(input1) >= 0:
+            if int(input2) <=59 and int(input2) >=0:
+                if int(input3) <=59 and int(input3) >=0:
+                    alarm = datetime.time(int(input1),int(input2),int(input3))
+                    result_time = (alarm == current)
+                    
+                    while result_time == True:
+                        try:
+                            while True:
+                                _dist = distance()
+                                print ("Distance = %.1f cm" % _dist)
+                                if _dist > 15:
+                                    GPIO.output(buzzer, GPIO.HIGH)
+
+                                else:
+                                    GPIO.output(buzzer, GPIO.LOW)
+                                    GPIO.cleanup()
+                                    
+                                    #data=requests.post('https://maker.ifttt.com/trigger/{motion_detected}/with/key/{cppbBYJLFKdKIEdV_7-R8n}')
+                                    #print (data.text)
+                        
+                        except KeyboardInterrupt:
+                            print("Interrupted by User")
+                            GPIO.cleanup()
+                            
+                        time.sleep(1)
+                    time.sleep(1)
+                else:
+                    LABEL = tkinter.Label(win, text="""Text '"""+input3+""" is not valid""", justify = tkinter.LEFT, padx = 20).pack()
+            else:
+                LABEL = tkinter.Label(win, text="""Text '"""+input2+""" is not valid""", justify = tkinter.LEFT, padx = 20).pack()
+        else:
+            LABEL = tkinter.Label(win, text="""Text '"""+input1+""" is not valid""", justify = tkinter.LEFT, padx = 20).pack()
+    except:
+        LABEL = tkinter.Label(win, text="""Your input is not valid""", justify = tkinter.LEFT, padx = 20).pack()
+
+
+def default():
+    while True:
+        time_period = time_in_range(start, end, current)
+
+        while time_period == True:
+            light_value = readLight()
+            if light_value > 10 and light_value < 200:
+                led.on()
+                try:
+                    while True:
+                        _dist = distance()
+                        print ("Distance = %.1f cm" % _dist)
+                        if _dist > 15:
+                            GPIO.output(buzzer, GPIO.HIGH)
+                    
+                        else:
+                            GPIO.output(buzzer, GPIO.LOW)
+                            GPIO.cleanup()
+                            #data=requests.post('https://maker.ifttt.com/trigger/{motion_detected}/with/key/{cppbBYJLFKdKIEdV_7-R8n}')
+                            #print (data.text)
+                        
+                except KeyboardInterrupt:
+                    print("Interrupted by User")
+                    GPIO.cleanup()
+            time.sleep(1)
+        time.sleep(1)
+
+#widgets
+my_text1 = Entry(win, bd = 1, font = myFont, width = 27)
+my_text1.pack(anchor = tkinter.W)
+my_text2 = Entry(win, bd = 1, font = myFont, width = 27)
+my_text2.pack(anchor = tkinter.W)
+my_text3 = Entry(win, bd = 1, font = myFont, width = 27)
+my_text3.pack(anchor = tkinter.W)
+
+getbutton = Button(win, text = 'Set time', font = myFont, command = alarm, bg = 'yellow', height = 1, width = 25).pack(anchor = tkinter.W)
+clearbutton = Button(win, text = 'Clear', font = myFont, command = clear, bg = 'white', height = 1, width = 25).pack(anchor = tkinter.W)
+exitbutton = Button(win, text = 'Exit', font = myFont, command = close, bg = 'red', height = 1, width = 25).pack(anchor = tkinter.W)
+defaultbutton = Button(win, text = 'Default', font = myFont, command = default, bg = 'blue', height = 1, width = 25).pack(anchor = tkinter.W)
+
+win.protocol("WM_DELETE_WINDOW", close)
+
+win.mainloop()
