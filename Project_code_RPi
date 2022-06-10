@@ -129,8 +129,8 @@ def alarm():
                                     GPIO.output(buzzer, GPIO.LOW)
                                     GPIO.cleanup()
                                     
-                                    #data=requests.post('https://maker.ifttt.com/trigger/{motion_detected}/with/key/{cppbBYJLFKdKIEdV_7-R8n}')
-                                    #print (data.text)
+                                    data=requests.post('https://maker.ifttt.com/trigger/{motion_detected}/with/key/{cppbBYJLFKdKIEdV_7-R8n}')
+                                    print (data.text)
                         
                         except KeyboardInterrupt:
                             print("Interrupted by User")
@@ -166,8 +166,8 @@ def default():
                         else:
                             GPIO.output(buzzer, GPIO.LOW)
                             GPIO.cleanup()
-                            #data=requests.post('https://maker.ifttt.com/trigger/{motion_detected}/with/key/{cppbBYJLFKdKIEdV_7-R8n}')
-                            #print (data.text)
+                            data=requests.post('https://maker.ifttt.com/trigger/{motion_detected}/with/key/{cppbBYJLFKdKIEdV_7-R8n}')
+                            print (data.text)
                         
                 except KeyboardInterrupt:
                     print("Interrupted by User")
